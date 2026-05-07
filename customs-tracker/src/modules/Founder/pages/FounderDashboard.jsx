@@ -1,183 +1,276 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '../../../services/supabaseClient'
+import { api } from '../../../services/api'
 
 export default function FounderDashboard({ user, profile, handleLogout }) {
-  const [currentTab, setCurrentTab] = useState('analytics') // 'analytics' or 'staff'
-  const [stats, setStats] = useState({ shipments: 0, customers: 0, staff: 0, pending: 0 })
+  const [currentTab, setCurrentTab] = useState('analytics')
+  const [stats, setStats] = useState({ shipments: 0, customers: 0, staff: 0, pending: 0, completed: 0 })
   const [loadingStats, setLoadingStats] = useState(true)
+  const [recentShipments, setRecentShipments] = useState([])
 
-  // Staff Creation State
+  // Staff Creation
   const [staffEmail, setStaffEmail] = useState('')
   const [staffPassword, setStaffPassword] = useState('')
   const [staffName, setStaffName] = useState('')
   const [staffMessage, setStaffMessage] = useState('')
+  const [staffList, setStaffList] = useState([])
+  const [loadingStaff, setLoadingStaff] = useState(false)
 
   useEffect(() => {
-    if (currentTab === 'analytics') {
-      fetchStats()
-    }
+    if (currentTab === 'analytics') fetchStats()
+    if (currentTab === 'staff') fetchStaffList()
   }, [currentTab])
 
   const fetchStats = async () => {
     setLoadingStats(true)
-    
-    // Using simple count queries
-    const { count: shipmentsCount } = await supabase.from('shipments').select('*', { count: 'exact', head: true })
-    const { count: customersCount } = await supabase.from('customers').select('*', { count: 'exact', head: true })
-    const { count: staffCount } = await supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'staff')
-    
-    // Count pending DO shipments as a useful metric
-    const { count: pendingCount } = await supabase.from('shipments').select('*', { count: 'exact', head: true }).eq('do_status', 'Pending')
+    try {
+      const data = await api.getStats()
+      setStats({
+        shipments: data.total,
+        customers: data.customers,
+        staff: data.staff,
+        pending: data.pending,
+        completed: data.completed,
+      })
+      setRecentShipments(data.recent || [])
+    } catch (err) {
+      console.error('Stats error:', err)
+    } finally {
+      setLoadingStats(false)
+    }
+  }
 
-    setStats({
-      shipments: shipmentsCount || 0,
-      customers: customersCount || 0,
-      staff: staffCount || 0,
-      pending: pendingCount || 0
-    })
-    
-    setLoadingStats(false)
+  const fetchStaffList = async () => {
+    setLoadingStaff(true)
+    try {
+      const data = await api.getStaff()
+      setStaffList(data || [])
+    } catch (err) {
+      console.error('Staff list error:', err)
+    } finally {
+      setLoadingStaff(false)
+    }
   }
 
   const handleCreateStaff = async () => {
     setStaffMessage('')
-    if (!staffEmail || !staffPassword || !staffName) {
-      setStaffMessage('Please fill all fields.')
-      return
-    }
-    const { error } = await supabase.auth.signUp({
-      email: staffEmail,
-      password: staffPassword,
-      options: { data: { full_name: staffName, role: 'staff' } }
-    })
-    if (error) {
-      setStaffMessage('Failed: ' + error.message)
-    } else {
+    if (!staffEmail || !staffPassword || !staffName) { setStaffMessage('Please fill all fields.'); return }
+    try {
+      await api.createStaff({ full_name: staffName, email: staffEmail, password: staffPassword })
       setStaffMessage('Staff account created successfully!')
-      setStaffEmail('')
-      setStaffPassword('')
-      setStaffName('')
-      if (currentTab === 'analytics') fetchStats() // refresh staff count
+      setStaffEmail(''); setStaffPassword(''); setStaffName('')
+      fetchStaffList()
+    } catch (err) {
+      setStaffMessage('Failed: ' + err.message)
     }
+  }
+
+  const getStatusBadge = (status) => {
+    if (!status) return <span className="status-badge default">—</span>
+    const cls = status.toLowerCase().replace(' ', '')
+    return <span className={`status-badge ${cls}`}>{status}</span>
   }
 
   return (
     <div className="dashboard-layout theme-purple">
-      {/* Sidebar Navigation */}
+      {/* Sidebar */}
       <div className="sidebar">
         <div className="sidebar-logo">
-          <span style={{ fontSize: '2rem' }}>🛡️</span> CustomsTracker
+          <span>🛡️</span> CustomsTracker
         </div>
         <div className="nav-links">
-          <div 
-            className={`nav-item ${currentTab === 'analytics' ? 'active' : ''}`} 
-            onClick={() => setCurrentTab('analytics')}
-          >
-            📊 Dashboard Analytics
+          <div className={`nav-item ${currentTab === 'analytics' ? 'active' : ''}`} onClick={() => setCurrentTab('analytics')}>
+            📊 Analytics
           </div>
-          <div 
-            className={`nav-item ${currentTab === 'staff' ? 'active' : ''}`} 
-            onClick={() => setCurrentTab('staff')}
-          >
+          <div className={`nav-item ${currentTab === 'staff' ? 'active' : ''}`} onClick={() => setCurrentTab('staff')}>
             👥 Staff Management
           </div>
-          
           <div className="nav-item" style={{ marginTop: 'auto' }} onClick={handleLogout}>
             🚪 Logout
           </div>
         </div>
       </div>
 
-      {/* Main Content Area */}
+      {/* Main Content */}
       <div className="main-content">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-          <div>
-            <h2 style={{ textAlign: 'left', margin: 0, fontSize: '2rem', color: 'var(--text-dark)' }}>
-              {currentTab === 'analytics' ? 'Operations Overview' : 'Staff Management'}
-            </h2>
-            <p style={{ color: 'var(--text-light)', fontSize: '1rem' }}>Admin Control Panel • {profile.full_name}</p>
-          </div>
+        {/* Header */}
+        <div style={{ marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: '1.5px solid #f3f4f6' }}>
+          <h2 style={{ textAlign: 'left', margin: 0, fontSize: '1.6rem', color: 'var(--text-dark)', fontWeight: 700 }}>
+            {currentTab === 'analytics' ? '📊 Operations Overview' : '👥 Staff Management'}
+          </h2>
+          <p style={{ color: 'var(--text-light)', fontSize: '0.88rem', marginTop: '0.25rem' }}>
+            Admin Control Panel • <strong style={{ color: 'var(--purple-600)' }}>{profile.full_name}</strong>
+          </p>
         </div>
 
+        {/* ── ANALYTICS TAB ── */}
         {currentTab === 'analytics' && (
           <div>
+            {/* Metric Tiles */}
             <div className="metrics-grid">
               <div className="metric-tile">
                 <span className="metric-title">Total Shipments</span>
-                <span className="metric-value">{loadingStats ? '...' : stats.shipments}</span>
+                <span className="metric-value">{loadingStats ? '…' : stats.shipments}</span>
               </div>
-              <div className="metric-tile">
+              <div className="metric-tile teal">
                 <span className="metric-title">Active Customers</span>
-                <span className="metric-value">{loadingStats ? '...' : stats.customers}</span>
+                <span className="metric-value">{loadingStats ? '…' : stats.customers}</span>
               </div>
-              <div className="metric-tile">
-                <span className="metric-title">Pending DO</span>
-                <span className="metric-value" style={{ color: '#ef4444' }}>{loadingStats ? '...' : stats.pending}</span>
+              <div className="metric-tile red">
+                <span className="metric-title">DO Pending</span>
+                <span className="metric-value">{loadingStats ? '…' : stats.pending}</span>
               </div>
-              <div className="metric-tile">
+              <div className="metric-tile amber">
+                <span className="metric-title">DO Completed</span>
+                <span className="metric-value">{loadingStats ? '…' : stats.completed}</span>
+              </div>
+              <div className="metric-tile pink">
                 <span className="metric-title">Staff Members</span>
-                <span className="metric-value" style={{ color: '#0d9488' }}>{loadingStats ? '...' : stats.staff}</span>
+                <span className="metric-value">{loadingStats ? '…' : stats.staff}</span>
               </div>
             </div>
 
-            <div className="chart-container">
-              <h3 style={{ color: 'var(--purple-600)', marginBottom: '1rem' }}>System Utilization Overview</h3>
-              <p style={{ color: 'var(--text-light)', marginBottom: '2rem' }}>Visual representation of active records in the database.</p>
-              
-              {/* Simple CSS Chart representing data scale */}
+            {/* Bar Chart */}
+            <div className="chart-container" style={{ marginBottom: '1.5rem' }}>
+              <h3 style={{ color: 'var(--purple-600)', marginBottom: '1.25rem', fontWeight: 700 }}>System Overview</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  <span style={{ width: '100px', fontWeight: 600, color: 'var(--text-dark)' }}>Shipments</span>
-                  <div style={{ flexGrow: 1, background: 'var(--purple-100)', height: '24px', borderRadius: '12px', overflow: 'hidden' }}>
-                    <div style={{ width: `${Math.min((stats.shipments / 100) * 100, 100)}%`, background: 'var(--purple-500)', height: '100%', transition: 'width 1s ease-out' }}></div>
+                {[
+                  { label: 'Shipments', value: stats.shipments, max: 100, color: 'var(--purple-500)', bg: 'var(--purple-100)' },
+                  { label: 'Customers', value: stats.customers, max: 50, color: 'var(--purple-400)', bg: 'var(--purple-100)' },
+                  { label: 'DO Pending', value: stats.pending, max: stats.shipments || 1, color: '#f87171', bg: '#fee2e2' },
+                  { label: 'Completed', value: stats.completed, max: stats.shipments || 1, color: '#34d399', bg: '#d1fae5' },
+                ].map(bar => (
+                  <div key={bar.label} style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <span style={{ width: '100px', fontWeight: 600, color: 'var(--text-dark)', fontSize: '0.9rem' }}>{bar.label}</span>
+                    <div style={{ flexGrow: 1, background: bar.bg, height: '20px', borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.06)' }}>
+                      <div style={{ width: `${Math.min((bar.value / bar.max) * 100, 100)}%`, background: bar.color, height: '100%', transition: 'width 1s ease-out', borderRadius: '10px' }} />
+                    </div>
+                    <span style={{ width: '36px', textAlign: 'right', fontWeight: 700, fontSize: '0.9rem' }}>{bar.value}</span>
                   </div>
-                  <span style={{ width: '40px', textAlign: 'right', fontWeight: 600 }}>{stats.shipments}</span>
-                </div>
-                
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  <span style={{ width: '100px', fontWeight: 600, color: 'var(--text-dark)' }}>Customers</span>
-                  <div style={{ flexGrow: 1, background: 'var(--purple-100)', height: '24px', borderRadius: '12px', overflow: 'hidden' }}>
-                    <div style={{ width: `${Math.min((stats.customers / 50) * 100, 100)}%`, background: 'var(--purple-400)', height: '100%', transition: 'width 1s ease-out' }}></div>
-                  </div>
-                  <span style={{ width: '40px', textAlign: 'right', fontWeight: 600 }}>{stats.customers}</span>
-                </div>
+                ))}
               </div>
+            </div>
+
+            {/* Recent Shipments Table */}
+            <div className="chart-container" style={{ border: '1.5px solid var(--purple-200)' }}>
+              <h3 style={{ color: 'var(--purple-600)', marginBottom: '1rem', fontWeight: 700 }}>📦 Recent Shipments</h3>
+              {loadingStats ? (
+                <p style={{ color: 'var(--text-light)', textAlign: 'center', padding: '2rem' }}>Loading…</p>
+              ) : recentShipments.length === 0 ? (
+                <p style={{ color: 'var(--text-light)', textAlign: 'center', padding: '2rem' }}>No shipments found.</p>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
+                    <thead>
+                      <tr>
+                        {['File No', 'Customer', 'ETA', 'Clear Status', 'DO Status', 'Progress', 'Entered By'].map(h => (
+                          <th key={h} style={{ background: '#ede9fe', color: 'var(--purple-600)', fontWeight: 700, fontSize: '0.78rem', letterSpacing: '0.4px', textTransform: 'uppercase', padding: '0.65rem 1rem', border: '1px solid #ddd6fe' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recentShipments.map((s, i) => (
+                        <tr key={s.id}>
+                          {[
+                            <strong>{s.file_no}</strong>,
+                            s.customers?.name || '—',
+                            s.eta || '—',
+                            getStatusBadge(s.clear_status),
+                            getStatusBadge(s.do_status),
+                            s.progress ? (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <div style={{ flexGrow: 1, background: '#ede9fe', height: '8px', borderRadius: '4px', overflow: 'hidden', minWidth: '50px' }}>
+                                  <div style={{ width: s.progress, background: 'var(--purple-500)', height: '100%', borderRadius: '4px' }} />
+                                </div>
+                                <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--purple-600)' }}>{s.progress}</span>
+                              </div>
+                            ) : '—',
+                            <span style={{ color: 'var(--text-light)', fontSize: '0.82rem' }}>{s.entered_by_profile?.full_name || '—'}</span>
+                          ].map((cell, ci) => (
+                            <td key={ci} style={{ padding: '0.65rem 1rem', border: '1px solid #e5e7eb', background: i % 2 === 0 ? 'white' : '#faf8ff' }}>{cell}</td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         )}
 
+        {/* ── STAFF MANAGEMENT TAB ── */}
         {currentTab === 'staff' && (
-          <div className="card wide" style={{ margin: '0 auto', boxShadow: '0 10px 30px rgba(124, 58, 237, 0.08)', border: '1px solid var(--purple-200)' }}>
-            <h3 style={{ color: 'var(--purple-600)', marginBottom: '0.5rem' }}>Create New Staff Account</h3>
-            <p style={{ color: 'var(--text-light)', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
-              Staff accounts have access to the Operations Dashboard to enter shipments and transport logs.
-            </p>
-            
-            <div className="form-group" style={{ marginBottom: '1rem' }}>
-              <label style={{ color: 'var(--purple-600)' }}>Full Name</label>
-              <input type="text" placeholder="e.g. John Doe" value={staffName} onChange={e => setStaffName(e.target.value)} style={{ border: '1px solid var(--purple-200)' }} />
+          <div>
+            {/* Create Staff Form */}
+            <div style={{ background: 'white', borderRadius: '16px', border: '1.5px solid var(--purple-200)', boxShadow: '0 4px 20px rgba(124,58,237,0.07)', padding: '1.5rem', marginBottom: '1.5rem', width: '100%', boxSizing: 'border-box' }}>
+              <h3 style={{ color: 'var(--purple-600)', marginBottom: '0.25rem', fontWeight: 700 }}>➕ Create New Staff Account</h3>
+              <p style={{ color: 'var(--text-light)', marginBottom: '1.25rem', fontSize: '0.88rem' }}>
+                Staff accounts can access the Operations Tracker Board to manage shipments.
+              </p>
+
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label style={{ color: 'var(--purple-600)' }}>Full Name</label>
+                <input type="text" placeholder="e.g. John Doe" value={staffName} onChange={e => setStaffName(e.target.value)} style={{ border: '1.5px solid var(--purple-200)' }} />
+              </div>
+
+              <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
+                <div className="form-group" style={{ flex: 1, minWidth: '200px' }}>
+                  <label style={{ color: 'var(--purple-600)' }}>Login ID (Email)</label>
+                  <input type="email" placeholder="staff@company.com" value={staffEmail} onChange={e => setStaffEmail(e.target.value)} style={{ border: '1.5px solid var(--purple-200)' }} />
+                </div>
+                <div className="form-group" style={{ flex: 1, minWidth: '200px' }}>
+                  <label style={{ color: 'var(--purple-600)' }}>Password</label>
+                  <input type="password" placeholder="••••••••" value={staffPassword} onChange={e => setStaffPassword(e.target.value)} style={{ border: '1.5px solid var(--purple-200)' }} />
+                </div>
+              </div>
+
+              <button
+                className="btn primary"
+                onClick={handleCreateStaff}
+                style={{ background: 'linear-gradient(135deg, var(--purple-400), var(--purple-600))', boxShadow: '0 4px 15px rgba(124,58,237,0.3)', width: '100%' }}
+              >
+                Create Staff Account
+              </button>
+
+              {staffMessage && (
+                <div className="msg" style={{ background: 'var(--purple-50)', color: 'var(--purple-600)', borderLeftColor: 'var(--purple-400)', marginTop: '1rem' }}>
+                  {staffMessage}
+                </div>
+              )}
             </div>
-            
-            <div className="dashboard-grid" style={{ marginTop: 0, marginBottom: '1.5rem' }}>
-              <div className="form-group">
-                <label style={{ color: 'var(--purple-600)' }}>Login ID (Email)</label>
-                <input type="email" placeholder="staff@company.com" value={staffEmail} onChange={e => setStaffEmail(e.target.value)} style={{ border: '1px solid var(--purple-200)' }} />
-              </div>
-              <div className="form-group">
-                <label style={{ color: 'var(--purple-600)' }}>Password</label>
-                <input type="password" placeholder="••••••••" value={staffPassword} onChange={e => setStaffPassword(e.target.value)} style={{ border: '1px solid var(--purple-200)' }} />
-              </div>
+
+            {/* Staff List Table */}
+            <div className="chart-container" style={{ border: '1.5px solid var(--purple-200)', padding: '1.5rem' }}>
+              <h3 style={{ color: 'var(--purple-600)', marginBottom: '1rem', fontWeight: 700 }}>👥 Current Staff Members</h3>
+              {loadingStaff ? (
+                <p style={{ color: 'var(--text-light)', textAlign: 'center', padding: '2rem' }}>Loading…</p>
+              ) : staffList.length === 0 ? (
+                <p style={{ color: 'var(--text-light)', textAlign: 'center', padding: '2rem' }}>No staff accounts found.</p>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                    <thead>
+                      <tr>
+                        {['#', 'Full Name', 'Date Added'].map(h => (
+                          <th key={h} style={{ background: '#ede9fe', color: 'var(--purple-600)', fontWeight: 700, fontSize: '0.78rem', letterSpacing: '0.4px', textTransform: 'uppercase', padding: '0.65rem 1rem', border: '1px solid #ddd6fe' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {staffList.map((s, i) => (
+                        <tr key={s.id}>
+                          <td style={{ padding: '0.65rem 1rem', border: '1px solid #e5e7eb', color: 'var(--text-light)', fontWeight: 600, background: i % 2 === 0 ? 'white' : '#faf8ff' }}>{i + 1}</td>
+                          <td style={{ padding: '0.65rem 1rem', border: '1px solid #e5e7eb', fontWeight: 600, background: i % 2 === 0 ? 'white' : '#faf8ff' }}>{s.full_name}</td>
+                          <td style={{ padding: '0.65rem 1rem', border: '1px solid #e5e7eb', color: 'var(--text-light)', fontSize: '0.85rem', background: i % 2 === 0 ? 'white' : '#faf8ff' }}>
+                            {new Date(s.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
-            
-            <button className="btn primary" onClick={handleCreateStaff} style={{ background: 'linear-gradient(135deg, var(--purple-400), var(--purple-600))', boxShadow: '0 4px 15px rgba(124, 58, 237, 0.3)' }}>
-              Create Staff Account
-            </button>
-            
-            {staffMessage && (
-              <div className="msg" style={{ background: 'var(--purple-50)', color: 'var(--purple-600)', borderLeftColor: 'var(--purple-400)', marginTop: '1rem' }}>
-                {staffMessage}
-              </div>
-            )}
           </div>
         )}
       </div>
