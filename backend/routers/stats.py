@@ -49,7 +49,7 @@ def get_stats(period: Optional[str] = "all", user: dict = Depends(get_current_us
         # Recent shipments with minimal fields to avoid join issues
         q = (
             supabase.table("shipments")
-            .select("id, file_no, eta, do_status, clear_status, progress, created_at, handled_by, customers(name)")
+            .select("id, file_no, eta, do_status, clear_status, progress, created_at, handled_by, entered_by, customers(name)")
             .order("created_at", desc=True)
             .limit(6)
         )
@@ -59,15 +59,19 @@ def get_stats(period: Optional[str] = "all", user: dict = Depends(get_current_us
         recent_resp = q.execute()
         raw_recent = recent_resp.data or []
         
-        # Resolve handled_by_name manually
+        # Batch resolve names for display
         h_ids = {s["handled_by"] for s in raw_recent if s.get("handled_by") and _is_valid_uuid(s["handled_by"])}
+        e_ids = {s["entered_by"] for s in raw_recent if s.get("entered_by") and _is_valid_uuid(s["entered_by"])}
+        all_ids = h_ids | e_ids
+
         profile_map = {}
-        if h_ids:
-            p_resp = supabase.table("profiles").select("id, full_name").in_("id", list(h_ids)).execute()
+        if all_ids:
+            p_resp = supabase.table("profiles").select("id, full_name").in_("id", list(all_ids)).execute()
             profile_map = {p["id"]: p["full_name"] for p in (p_resp.data or [])}
 
         recent_data = []
         for s in raw_recent:
+            # Resolve Handled By
             h_val = s.get("handled_by")
             if h_val:
                 if _is_valid_uuid(h_val):
@@ -76,6 +80,11 @@ def get_stats(period: Optional[str] = "all", user: dict = Depends(get_current_us
                     s["handled_by_name"] = h_val
             else:
                 s["handled_by_name"] = ""
+
+            # Resolve Entered By
+            e_val = s.get("entered_by")
+            s["entered_by_profile"] = {"full_name": profile_map.get(e_val, "Founder") if e_val else "Founder"}
+            
             recent_data.append(s)
 
         return {
