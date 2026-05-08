@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
 from routers import shipments, customers, staff, stats
@@ -33,4 +33,18 @@ def health():
     return {"status": "ok"}
 
 
-
+@app.get("/api/me")
+def get_me(user: dict = Depends(__import__("auth").get_current_user)):
+    """Return the current user's profile including all permissions."""
+    from database import supabase
+    resp = (
+        supabase.table("profiles")
+        .select("id, full_name, role, view_access, enter_access, edit_access, delete_access, created_at")
+        .eq("id", user["sub"])
+        .maybe_single()
+        .execute()
+    )
+    if not resp.data:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Profile not found.")
+    return resp.data

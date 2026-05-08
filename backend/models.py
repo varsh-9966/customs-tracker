@@ -8,6 +8,7 @@ class ShipmentCreate(BaseModel):
     customer_name: str          # resolved to customer_id server-side
     eta: Optional[str] = None
     containers: Optional[str] = None
+    container_type: Optional[str] = None
     qty: Optional[str] = None
     bl_no: Optional[str] = None
     docs_received: Optional[bool] = None
@@ -24,6 +25,9 @@ class ShipmentCreate(BaseModel):
     billed_date: Optional[str] = None
     progress: Optional[str] = None
     remarks: Optional[str] = None
+    be_no: Optional[str] = None
+    be_date: Optional[str] = None
+    handled_by: Optional[str] = None
     # Transport (stored in transport_logs table)
     transport_name: Optional[str] = None
     vehicle_no: Optional[str] = None
@@ -32,6 +36,7 @@ class ShipmentCreate(BaseModel):
 class ShipmentUpdate(BaseModel):
     eta: Optional[str] = None
     containers: Optional[str] = None
+    container_type: Optional[str] = None
     qty: Optional[str] = None
     bl_no: Optional[str] = None
     docs_received: Optional[bool] = None
@@ -48,6 +53,9 @@ class ShipmentUpdate(BaseModel):
     billed_date: Optional[str] = None
     progress: Optional[str] = None
     remarks: Optional[str] = None
+    be_no: Optional[str] = None
+    be_date: Optional[str] = None
+    handled_by: Optional[str] = None
     transport_name: Optional[str] = None
     vehicle_no: Optional[str] = None
 

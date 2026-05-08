@@ -15,7 +15,7 @@ def list_staff(user: dict = Depends(require_founder)):
     try:
         result = (
             supabase.table("profiles")
-            .select("id, full_name, created_at")
+            .select("id, full_name, created_at, view_access, enter_access, delete_access, edit_access")
             .eq("role", "staff")
             .order("created_at", desc=True)
             .execute()
@@ -60,6 +60,23 @@ def create_staff(body: StaffCreate, user: dict = Depends(require_founder)):
         return {"message": f"Staff account for {body.full_name} created successfully."}
     except HTTPException:
         raise
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+from pydantic import BaseModel
+class StaffPermissions(BaseModel):
+    view_access: bool
+    enter_access: bool
+    delete_access: bool
+    edit_access: bool
+
+@router.patch("/{staff_id}/permissions")
+def update_staff_permissions(staff_id: str, body: StaffPermissions, user: dict = Depends(require_founder)):
+    """Update permissions for a staff account."""
+    try:
+        supabase.table("profiles").update(body.dict()).eq("id", staff_id).execute()
+        return {"message": "Permissions updated successfully."}
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))

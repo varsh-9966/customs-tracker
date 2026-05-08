@@ -13,26 +13,11 @@
 
 import { supabase } from './supabaseClient'
 
-// Cache token at module level — updated by onAuthStateChange (fires on login/logout/refresh)
-let _token = null
-
-supabase.auth.onAuthStateChange((_event, session) => {
-  _token = session?.access_token ?? null
-})
-
-// Also seed it immediately from stored session (handles page refresh)
-supabase.auth.getSession().then(({ data: { session } }) => {
-  if (session?.access_token) _token = session.access_token
-})
-
-/** Returns cached JWT token, or falls back to getSession() if cache is empty. */
+/** Returns JWT token from active session, handles auto-refresh via Supabase. */
 async function getToken() {
-  if (_token) return _token
-  // Fallback: re-read from storage (handles rare cold-start cases)
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session?.access_token) throw new Error('Not authenticated.')
-  _token = session.access_token
-  return _token
+  const { data: { session }, error } = await supabase.auth.getSession()
+  if (error || !session?.access_token) throw new Error('Not authenticated.')
+  return session.access_token
 }
 
 /** Base fetch wrapper — attaches Authorization header automatically. */
@@ -56,11 +41,13 @@ async function request(path, options = {}) {
 // ── Stats ────────────────────────────────────────────────
 export const api = {
   /** GET /api/stats — dashboard counts + recent shipments */
-  getStats: () => request('/api/stats'),
+  getStats: (period) => request(`/api/stats${period ? `?period=${period}` : ''}`),
+  /** GET /api/stats/advanced — aggregation for charts */
+  getAdvancedStats: () => request('/api/stats/advanced'),
 
   // ── Shipments ─────────────────────────────────────────
   /** GET /api/shipments — all shipments (with customer, transport, entered-by) */
-  getShipments: () => request('/api/shipments'),
+  getShipments: (status) => request(`/api/shipments${status ? `?status=${encodeURIComponent(status)}` : ''}`),
 
   /** POST /api/shipments — create a new shipment */
   createShipment: (body) =>
@@ -86,4 +73,8 @@ export const api = {
   /** POST /api/staff — create staff account (founder only) */
   createStaff: (body) =>
     request('/api/staff', { method: 'POST', body: JSON.stringify(body) }),
+
+  /** PATCH /api/staff/:id/permissions — update staff permissions (founder only) */
+  updateStaffPermissions: (id, body) =>
+    request(`/api/staff/${id}/permissions`, { method: 'PATCH', body: JSON.stringify(body) }),
 }

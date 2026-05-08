@@ -848,3 +848,29 @@ select {
 .status-badge.assessment { background: #ede9fe; color: #7c3aed; }
 .status-badge.examination { background: #fee2e2; color: #dc2626; }
 .status-badge.default { background: #f3f4f6; color: #6b7280; }
+
+/* ── Print utilities ── */
+.no-print { /* visible on screen */ }
+
+@media print {
+  .no-print { display: none !important; }
+  .sidebar { display: none !important; }
+  .fab-container { display: none !important; }
+  .main-content { padding: 0 !important; overflow: visible !important; }
+  body { background: white !important; }
+
+  /* Show print-only header */
+  .print-only-header { display: block !important; }
+
+  /* Only the table wrapper prints */
+  #print-report-table,
+  #print-report-table * { visibility: visible; }
+
+  #print-report-table table { width: 100%; font-size: 0.78rem; }
+  #print-report-table th {
+    background: #ede9fe !important;
+    color: #7c3aed !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

@@ -66,13 +66,38 @@ def _decode_token(token: str) -> dict:
         # Read the JWT header without verifying (to get kid + alg)
         header = pyjwt.get_unverified_header(token)
         kid = header.get("kid")
-        alg = header.get("alg", "ES256")
+        alg = header.get("alg", "HS256")
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Malformed token header: {e}",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    if alg == "HS256":
+        from config import SUPABASE_JWT_SECRET
+        try:
+            payload = pyjwt.decode(
+                token,
+                SUPABASE_JWT_SECRET,
+                algorithms=["HS256"],
+                options={"verify_aud": False},
+                leeway=60,
+            )
+            return payload
+        except pyjwt.exceptions.ExpiredSignatureError:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token has expired. Please log in again.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        except pyjwt.exceptions.InvalidTokenError as e:
+            print(f"[auth] Token invalid (HS256): {e}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=f"Invalid authentication token (HS256): {e}",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
 
     public_key = _get_public_key(kid, alg)
     if public_key is None:
@@ -93,6 +118,7 @@ def _decode_token(token: str) -> dict:
             public_key,
             algorithms=[alg],
             options={"verify_aud": False},
+            leeway=60,
         )
         return payload
     except pyjwt.exceptions.ExpiredSignatureError:
@@ -105,7 +131,7 @@ def _decode_token(token: str) -> dict:
         print(f"[auth] Token invalid: {e}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication token.",
+            detail=f"Invalid authentication token: {e}",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -143,3 +169,56 @@ def require_founder(user: dict = Depends(get_current_user)) -> dict:
             detail="Founder access required.",
         )
     return user
+
+
+def _get_profile(user_id: str) -> dict:
+    """Fetch full profile row for a user."""
+    from database import supabase
+    resp = (
+        supabase.table("profiles")
+        .select("role, enter_access, edit_access, delete_access, view_access")
+        .eq("id", user_id)
+        .maybe_single()
+        .execute()
+    )
+    return resp.data or {}
+
+
+def require_enter_access(user: dict = Depends(get_current_user)) -> dict:
+    """Allow founders always; allow staff only if enter_access=true."""
+    profile = _get_profile(user["sub"])
+    if profile.get("role") == "founder":
+        return user
+    if not profile.get("enter_access"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to add shipments.",
+        )
+    return user
+
+
+def require_edit_access(user: dict = Depends(get_current_user)) -> dict:
+    """Allow founders always; allow staff only if edit_access=true."""
+    profile = _get_profile(user["sub"])
+    if profile.get("role") == "founder":
+        return user
+    if not profile.get("edit_access"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to edit shipments.",
+        )
+    return user
+
+
+def require_delete_access(user: dict = Depends(get_current_user)) -> dict:
+    """Allow founders always; allow staff only if delete_access=true."""
+    profile = _get_profile(user["sub"])
+    if profile.get("role") == "founder":
+        return user
+    if not profile.get("delete_access"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to delete shipments.",
+        )
+    return user
+

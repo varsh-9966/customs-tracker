@@ -1,11 +1,17 @@
 import { useState, useEffect } from 'react'
 import { api } from '../../../services/api'
+import Reports from '../../Shared/Reports'
 
 export default function FounderDashboard({ user, profile, handleLogout }) {
   const [currentTab, setCurrentTab] = useState('analytics')
   const [stats, setStats] = useState({ shipments: 0, customers: 0, staff: 0, pending: 0, completed: 0 })
   const [loadingStats, setLoadingStats] = useState(true)
   const [recentShipments, setRecentShipments] = useState([])
+  const [shipments, setShipments] = useState([])
+  const [loadingShipments, setLoadingShipments] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [historyFilter, setHistoryFilter] = useState('')
+  const [dashboardFilter, setDashboardFilter] = useState('all')
 
   // Staff Creation
   const [staffEmail, setStaffEmail] = useState('')
@@ -18,12 +24,25 @@ export default function FounderDashboard({ user, profile, handleLogout }) {
   useEffect(() => {
     if (currentTab === 'analytics') fetchStats()
     if (currentTab === 'staff') fetchStaffList()
-  }, [currentTab])
+    if (currentTab === 'tracker') fetchShipments()
+  }, [currentTab, dashboardFilter, historyFilter])
+
+  const fetchShipments = async () => {
+    setLoadingShipments(true)
+    try {
+      const data = await api.getShipments(historyFilter)
+      setShipments(data)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoadingShipments(false)
+    }
+  }
 
   const fetchStats = async () => {
     setLoadingStats(true)
     try {
-      const data = await api.getStats()
+      const data = await api.getStats(dashboardFilter)
       setStats({
         shipments: data.total,
         customers: data.customers,
@@ -64,6 +83,28 @@ export default function FounderDashboard({ user, profile, handleLogout }) {
     }
   }
 
+  const handlePermissionChange = async (staffId, field, value) => {
+    try {
+      const staffMember = staffList.find(s => s.id === staffId);
+      if (!staffMember) return;
+      const updatedPermissions = {
+        view_access: staffMember.view_access || false,
+        enter_access: staffMember.enter_access || false,
+        delete_access: staffMember.delete_access || false,
+        edit_access: staffMember.edit_access || false,
+        [field]: value
+      };
+      
+      // Optimistic UI update
+      setStaffList(prev => prev.map(s => s.id === staffId ? { ...s, ...updatedPermissions } : s));
+      
+      await api.updateStaffPermissions(staffId, updatedPermissions);
+    } catch (err) {
+      console.error('Failed to update permission', err);
+      fetchStaffList(); // Revert on failure
+    }
+  }
+
   const getStatusBadge = (status) => {
     if (!status) return <span className="status-badge default">—</span>
     const cls = status.toLowerCase().replace(' ', '')
@@ -81,6 +122,12 @@ export default function FounderDashboard({ user, profile, handleLogout }) {
           <div className={`nav-item ${currentTab === 'analytics' ? 'active' : ''}`} onClick={() => setCurrentTab('analytics')}>
             📊 Analytics
           </div>
+          <div className={`nav-item ${currentTab === 'tracker' ? 'active' : ''}`} onClick={() => setCurrentTab('tracker')}>
+            📋 Tracker Board
+          </div>
+          <div className={`nav-item ${currentTab === 'reports' ? 'active' : ''}`} onClick={() => setCurrentTab('reports')}>
+            📄 Reports
+          </div>
           <div className={`nav-item ${currentTab === 'staff' ? 'active' : ''}`} onClick={() => setCurrentTab('staff')}>
             👥 Staff Management
           </div>
@@ -95,7 +142,10 @@ export default function FounderDashboard({ user, profile, handleLogout }) {
         {/* Header */}
         <div style={{ marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: '1.5px solid #f3f4f6' }}>
           <h2 style={{ textAlign: 'left', margin: 0, fontSize: '1.6rem', color: 'var(--text-dark)', fontWeight: 700 }}>
-            {currentTab === 'analytics' ? '📊 Operations Overview' : '👥 Staff Management'}
+            {currentTab === 'analytics' && '📊 Operations Overview'}
+            {currentTab === 'tracker' && '📋 Tracker Board'}
+            {currentTab === 'reports' && '📄 Reports'}
+            {currentTab === 'staff' && '👥 Staff Management'}
           </h2>
           <p style={{ color: 'var(--text-light)', fontSize: '0.88rem', marginTop: '0.25rem' }}>
             Admin Control Panel • <strong style={{ color: 'var(--purple-600)' }}>{profile.full_name}</strong>
@@ -105,6 +155,17 @@ export default function FounderDashboard({ user, profile, handleLogout }) {
         {/* ── ANALYTICS TAB ── */}
         {currentTab === 'analytics' && (
           <div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: '1.2rem' }}>🎛️</span>
+                <select className="table-select" value={dashboardFilter} onChange={e => setDashboardFilter(e.target.value)} style={{ width: '180px', borderRadius: '20px' }}>
+                  <option value="all">All Time</option>
+                  <option value="month">This Month</option>
+                  <option value="week">This Week</option>
+                </select>
+              </div>
+            </div>
+            
             {/* Metric Tiles */}
             <div className="metrics-grid">
               <div className="metric-tile">
@@ -251,7 +312,7 @@ export default function FounderDashboard({ user, profile, handleLogout }) {
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
                     <thead>
                       <tr>
-                        {['#', 'Full Name', 'Date Added'].map(h => (
+                        {['#', 'Full Name', 'Date Added', 'Permissions'].map(h => (
                           <th key={h} style={{ background: '#ede9fe', color: 'var(--purple-600)', fontWeight: 700, fontSize: '0.78rem', letterSpacing: '0.4px', textTransform: 'uppercase', padding: '0.65rem 1rem', border: '1px solid #ddd6fe' }}>{h}</th>
                         ))}
                       </tr>
@@ -264,12 +325,127 @@ export default function FounderDashboard({ user, profile, handleLogout }) {
                           <td style={{ padding: '0.65rem 1rem', border: '1px solid #e5e7eb', color: 'var(--text-light)', fontSize: '0.85rem', background: i % 2 === 0 ? 'white' : '#faf8ff' }}>
                             {new Date(s.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                           </td>
+                          <td style={{ padding: '0.65rem 1rem', border: '1px solid #e5e7eb', background: i % 2 === 0 ? 'white' : '#faf8ff' }}>
+                            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                              <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>
+                                <input type="checkbox" checked={s.view_access} onChange={(e) => handlePermissionChange(s.id, 'view_access', e.target.checked)} />
+                                View
+                              </label>
+                              <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>
+                                <input type="checkbox" checked={s.enter_access} onChange={(e) => handlePermissionChange(s.id, 'enter_access', e.target.checked)} />
+                                Enter
+                              </label>
+                              <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>
+                                <input type="checkbox" checked={s.edit_access} onChange={(e) => handlePermissionChange(s.id, 'edit_access', e.target.checked)} />
+                                Edit
+                              </label>
+                              <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>
+                                <input type="checkbox" checked={s.delete_access} onChange={(e) => handlePermissionChange(s.id, 'delete_access', e.target.checked)} />
+                                Delete
+                              </label>
+                            </div>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* ── REPORTS TAB ── */}
+        {currentTab === 'reports' && (
+          <Reports />
+        )}
+
+        {/* ── TRACKER TAB ── */}
+        {currentTab === 'tracker' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
+            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem', alignItems: 'center' }}>
+              <input
+                type="text"
+                placeholder="🔍 Search File No, Customer, BL No..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="table-input"
+                style={{ width: '260px', borderRadius: '20px' }}
+              />
+              <span style={{ fontSize: '1.2rem' }}>🎛️</span>
+              <select className="table-select" value={historyFilter} onChange={e => setHistoryFilter(e.target.value)} style={{ width: '200px', borderRadius: '20px' }}>
+                <option value="">All Status (History)</option>
+                <option value="Completed">Completed</option>
+                <option value="Pending">Pending</option>
+                <option value="Assessment">Assessment</option>
+                <option value="Examination">Examination</option>
+              </select>
+            </div>
+            <div className="table-container" style={{ flexGrow: 1, minHeight: '500px', overflowY: 'auto' }}>
+              <table className="staff-table" style={{ width: '100%', minWidth: '1500px' }}>
+                <thead>
+                  <tr>
+                    <th colSpan="7" style={{ background: '#f0fdfa', color: '#0d9488', textAlign: 'center', borderRight: '2px solid #d1d5db' }}>BASIC INFO</th>
+                    <th colSpan="2" style={{ background: '#ccfbf1', color: '#0d9488', textAlign: 'center', borderRight: '2px solid #d1d5db' }}>DOCUMENTS</th>
+                    <th colSpan="7" style={{ background: '#99f6e4', color: '#0f766e', textAlign: 'center', borderRight: '2px solid #d1d5db' }}>CUSTOMS CLEARANCE</th>
+                    <th colSpan="2" style={{ background: '#5eead4', color: '#0f766e', textAlign: 'center', borderRight: '2px solid #d1d5db' }}>DELIVERY ORDER</th>
+                    <th colSpan="3" style={{ background: '#2dd4bf', color: 'white', textAlign: 'center', borderRight: '2px solid #d1d5db' }}>TRANSPORT</th>
+                    <th colSpan="6" style={{ background: '#14b8a6', color: 'white', textAlign: 'center' }}>COMPLETION & TRACKING</th>
+                  </tr>
+                  <tr>
+                    <th>FILE NO</th><th>CUSTOMER</th><th>ETA</th><th>CONTAINERS</th><th>CONTAINER TYPE</th><th>QTY</th>
+                    <th style={{ borderRight: '2px solid #d1d5db' }}>BL NO</th>
+                    <th>DOCS RCVD</th><th style={{ borderRight: '2px solid #d1d5db' }}>DOCS DATE</th>
+                    <th>CLEAR MODE</th><th>BE NO</th><th>BE DATE</th><th>BE FILED</th><th>CLEAR STATUS</th><th>STATUS DATE</th><th style={{ borderRight: '2px solid #d1d5db' }}>HANDLED BY</th>
+                    <th>DO STATUS</th><th style={{ borderRight: '2px solid #d1d5db' }}>DO DATE</th>
+                    <th>DELIVERY TYPE</th><th>TRANSPORT</th><th style={{ borderRight: '2px solid #d1d5db' }}>VEHICLE NO</th>
+                    <th>FACTORY DEL.</th><th>EMPTY RET.</th><th>BILLED DATE</th><th>PROGRESS</th><th>REMARKS</th><th>ENTERED BY</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loadingShipments && <tr><td colSpan="26" style={{ textAlign: 'center', padding: '2rem' }}>Loading data...</td></tr>}
+                  {!loadingShipments && shipments.filter(s => {
+                    const search = searchTerm.toLowerCase();
+                    const matchesSearch = (s.file_no && s.file_no.toLowerCase().includes(search)) ||
+                      (s.customers?.name && s.customers.name.toLowerCase().includes(search)) ||
+                      (s.bl_no && s.bl_no.toLowerCase().includes(search));
+                    return matchesSearch;
+                  }).map(s => (
+                    <tr key={s.id}>
+                      <td><strong>{s.file_no}</strong></td>
+                      <td>{s.customers?.name}</td>
+                      <td>{s.eta}</td>
+                      <td>{s.containers}</td>
+                      <td>{s.container_type}</td>
+                      <td>{s.qty}</td>
+                      <td style={{ borderRight: '2px solid #d1d5db' }}>{s.bl_no}</td>
+                      <td>{s.docs_received ? 'Yes' : (s.docs_received === false ? 'No' : '')}</td>
+                      <td style={{ borderRight: '2px solid #d1d5db' }}>{s.docs_date}</td>
+                      <td>{s.clear_mode}</td>
+                      <td>{s.be_no}</td>
+                      <td>{s.be_date}</td>
+                      <td>{s.be_filed_date}</td>
+                      <td>{s.clear_status}</td>
+                      <td>{s.clear_status_date}</td>
+                      <td style={{ borderRight: '2px solid #d1d5db' }}>{s.handled_by_name || s.handled_by}</td>
+                      <td>{s.do_status}</td>
+                      <td style={{ borderRight: '2px solid #d1d5db' }}>{s.do_date}</td>
+                      <td>{s.delivery_type}</td>
+                      <td>{s.transport_name}</td>
+                      <td style={{ borderRight: '2px solid #d1d5db' }}>{s.vehicle_no}</td>
+                      <td>{s.factory_delivered}</td>
+                      <td>{s.empty_returned}</td>
+                      <td>{s.billed_date}</td>
+                      <td>{s.progress}</td>
+                      <td>{s.remarks}</td>
+                      <td style={{ color: 'var(--purple-600)', fontWeight: 600 }}>{s.entered_by_profile?.full_name || 'Founder'}</td>
+                    </tr>
+                  ))}
+                  {!loadingShipments && shipments.length === 0 && (
+                    <tr><td colSpan="26" style={{ textAlign: 'center', padding: '2rem' }}>No shipments found.</td></tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
