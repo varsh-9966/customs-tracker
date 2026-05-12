@@ -23,6 +23,7 @@ class ShipmentCreate(BaseModel):
     factory_delivered: Optional[str] = None
     empty_returned: Optional[str] = None
     billed_date: Optional[str] = None
+    moved_to_date: Optional[str] = None
     progress: Optional[str] = None
     remarks: Optional[str] = None
     be_no: Optional[str] = None
@@ -51,6 +52,7 @@ class ShipmentUpdate(BaseModel):
     factory_delivered: Optional[str] = None
     empty_returned: Optional[str] = None
     billed_date: Optional[str] = None
+    moved_to_date: Optional[str] = None
     progress: Optional[str] = None
     remarks: Optional[str] = None
     be_no: Optional[str] = None

@@ -34,10 +34,15 @@
   font-family: 'Outfit', sans-serif;
 }
 
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
 body {
   background: linear-gradient(135deg, var(--pink-50) 0%, var(--pink-100) 100%);
   color: var(--text-dark);
-  min-height: 100vh;
 }
 
 .container {
@@ -308,8 +313,13 @@ select {
 }
 
 .login-header .logo {
-  font-size: 3rem;
   margin-bottom: 0.5rem;
+}
+
+.login-header .logo img {
+  max-width: 100%;
+  height: 60px;
+  object-fit: contain;
   animation: float 3s ease-in-out infinite;
 }
 
@@ -518,11 +528,10 @@ select {
   padding: 0.6rem 1rem;
 }
 
-/* --- SIDEBAR LAYOUT --- */
 .dashboard-layout {
   display: flex;
-  height: 100vh;
-  width: 100vw;
+  height: 100%;
+  width: 100%;
   overflow: hidden;
   background: var(--pink-50);
 }
@@ -532,8 +541,8 @@ select {
 }
 
 .sidebar {
-  width: 220px;
-  min-width: 220px;
+  width: 250px;
+  min-width: 250px;
   background: white;
   border-right: 1.5px solid #f3e8ff;
   display: flex;
@@ -550,16 +559,24 @@ select {
 
 .sidebar-logo {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 0.6rem;
-  font-size: 1.05rem;
-  font-weight: 700;
+  justify-content: center;
+  gap: 0.8rem;
+  font-size: 1.15rem;
+  font-weight: 800;
+  text-align: center;
   color: var(--text-dark);
   margin-bottom: 2rem;
   padding-bottom: 1.25rem;
   border-bottom: 1px solid #f3f4f6;
-  white-space: nowrap;
-  overflow: hidden;
+  white-space: normal;
+}
+
+.sidebar-logo img {
+  height: 60px !important;
+  max-width: 100%;
+  object-fit: contain;
 }
 
 .sidebar-logo span {
@@ -616,7 +633,7 @@ select {
   min-width: 0;
   padding: 1.75rem 2rem;
   overflow-y: auto;
-  overflow-x: hidden;
+  overflow-x: auto;
   display: flex;
   flex-direction: column;
 }
@@ -872,5 +889,117 @@ select {
     color: #7c3aed !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+  }
+}
+
+/* --- MOBILE HEADER (Hidden on desktop) --- */
+.mobile-header {
+  display: none;
+}
+
+/* --- RESPONSIVE LAYOUT (MOBILE & LAPTOP) --- */
+@media (max-width: 768px) {
+  .dashboard-layout {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  
+  .mobile-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.8rem 1.25rem;
+    background: white;
+    border-bottom: 1px solid #f3e8ff;
+    z-index: 60;
+    position: sticky;
+    top: 0;
+  }
+  
+  .mobile-logo {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: var(--text-dark);
+  }
+  
+  .hamburger-btn {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: var(--text-dark);
+    cursor: pointer;
+    padding: 0.2rem 0.5rem;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 60px; /* Approximate height of mobile header */
+    left: -100%;
+    width: 250px;
+    height: calc(100vh - 60px);
+    background: white;
+    border-right: 1.5px solid #f3e8ff;
+    transition: left 0.3s ease;
+    z-index: 100;
+    padding: 1rem;
+  }
+
+  .sidebar.open {
+    left: 0;
+    box-shadow: 4px 0 15px rgba(0,0,0,0.1);
+  }
+
+  .sidebar-logo {
+    display: none; /* Hide large logo inside mobile drawer */
+  }
+
+  .nav-links {
+    margin-top: 0;
+    width: 100%;
+  }
+
+  .nav-item {
+    padding: 1rem;
+    font-size: 1rem;
+  }
+  .main-content {
+    padding: 1rem;
+  }
+  .dashboard-grid, .metrics-grid, .staff-metrics-grid {
+    grid-template-columns: 1fr;
+  }
+  .login-card {
+    padding: 2rem 1.5rem;
+  }
+  .table-container {
+    padding: 0;
+  }
+  h2 {
+    font-size: 1.4rem;
+  }
+  .filter-bar {
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+  .filter-bar input, .filter-bar select {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  .sidebar {
+    width: 200px;
+    min-width: 200px;
+    padding: 1.5rem 1rem;
+  }
+  .main-content {
+    padding: 1.5rem;
+  }
+  .metrics-grid, .staff-metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 }

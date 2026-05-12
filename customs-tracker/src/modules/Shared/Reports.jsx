@@ -1,17 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../services/api';
 
-export default function Reports({ profile }) {
+export default function Reports({ profile, initialStatusFilter = '' }) {
   const [shipments, setShipments] = useState([]);
   const [advStats, setAdvStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [dateFilter, setDateFilter] = useState({ start: '', end: '' });
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState(initialStatusFilter);
 
   useEffect(() => {
     fetchData();
   }, []);
+
+  useEffect(() => {
+    if (initialStatusFilter) {
+      setStatusFilter(initialStatusFilter);
+    }
+  }, [initialStatusFilter]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -53,7 +59,7 @@ export default function Reports({ profile }) {
   });
 
   const exportCSV = () => {
-    const headers = ['File No', 'Customer', 'ETA', 'Containers', 'Container Type', 'Clear Mode', 'BE No', 'Clear Status', 'DO Status', 'Handled By', 'Progress', 'Entered By'];
+    const headers = ['File No', 'Customer', 'ETA', 'Containers', 'Container Type', 'Clear Mode', 'BE No', 'Clear Status', 'DO Status', 'Handled By', 'Moved To Date', 'Billed Date', 'Progress', 'Entered By'];
     const rows = filteredShipments.map(s => [
       s.file_no || '',
       s.customers?.name || '',
@@ -65,13 +71,15 @@ export default function Reports({ profile }) {
       s.clear_status || '',
       s.do_status || '',
       s.handled_by_name || s.handled_by || '',
+      s.moved_to_date || '',
+      s.billed_date || '',
       s.progress || '',
       s.entered_by_profile?.full_name || '',
     ]);
     const csvContent = 'data:text/csv;charset=utf-8,' + headers.join(',') + '\n' + rows.map(r => r.join(',')).join('\n');
     const link = document.createElement('a');
     link.setAttribute('href', encodeURI(csvContent));
-    link.setAttribute('download', 'customs_report.csv');
+    link.setAttribute('download', 'shipment_report.csv');
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -162,6 +170,12 @@ export default function Reports({ profile }) {
           padding: 1.25rem;
           border-left: 4px solid #7c3aed;
           box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+          transition: transform 0.2s, box-shadow 0.2s;
+          cursor: pointer;
+        }
+        .metric-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         }
       `}</style>
 
@@ -181,23 +195,23 @@ export default function Reports({ profile }) {
 
         {/* KPI Row */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
-          <div className="metric-card">
+          <div className="metric-card" onClick={() => setStatusFilter('')}>
             <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Total Shipments</span>
             <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#1e293b', marginTop: '0.5rem' }}>{loading ? '...' : shipments.length}</div>
           </div>
-          <div className="metric-card" style={{ borderLeftColor: '#10b981' }}>
+          <div className="metric-card" onClick={() => setStatusFilter('')} style={{ borderLeftColor: '#10b981' }}>
             <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Containers (Est. TEU)</span>
             <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#1e293b', marginTop: '0.5rem' }}>
               {loading ? '...' : advStats?.customerVolumes?.reduce((acc, c) => acc + c.value, 0) || 0}
             </div>
           </div>
-          <div className="metric-card" style={{ borderLeftColor: '#3b82f6' }}>
+          <div className="metric-card" onClick={() => setStatusFilter('Completed')} style={{ borderLeftColor: '#3b82f6' }}>
             <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Completed DOs</span>
             <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#1e293b', marginTop: '0.5rem' }}>
               {loading ? '...' : shipments.filter(s => s.do_status === 'Completed').length}
             </div>
           </div>
-          <div className="metric-card" style={{ borderLeftColor: '#f59e0b' }}>
+          <div className="metric-card" onClick={() => setStatusFilter('Assessment')} style={{ borderLeftColor: '#f59e0b' }}>
             <span style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>In Assessment</span>
             <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#1e293b', marginTop: '0.5rem' }}>
               {loading ? '...' : shipments.filter(s => s.clear_status === 'Assessment').length}

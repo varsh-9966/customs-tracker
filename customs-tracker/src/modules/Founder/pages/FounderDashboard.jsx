@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { api } from '../../../services/api'
 import Reports from '../../Shared/Reports'
+import logoUrl from '../../../assets/logo.png'
 
-export default function FounderDashboard({ user, profile, handleLogout }) {
+export default function FounderDashboard({ user, profile, handleLogout, installApp }) {
   const [currentTab, setCurrentTab] = useState('analytics')
   const [stats, setStats] = useState({ shipments: 0, customers: 0, staff: 0, pending: 0, completed: 0 })
   const [loadingStats, setLoadingStats] = useState(true)
@@ -11,7 +12,9 @@ export default function FounderDashboard({ user, profile, handleLogout }) {
   const [loadingShipments, setLoadingShipments] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [historyFilter, setHistoryFilter] = useState('')
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [dashboardFilter, setDashboardFilter] = useState('all')
+  const [reportStatusFilter, setReportStatusFilter] = useState('')
 
   // Staff Creation
   const [staffEmail, setStaffEmail] = useState('')
@@ -113,10 +116,22 @@ export default function FounderDashboard({ user, profile, handleLogout }) {
 
   return (
     <div className="dashboard-layout theme-purple">
+      {/* Mobile Header */}
+      <div className="mobile-header">
+        <div className="mobile-logo">
+          <img src={logoUrl} alt="Logo" style={{height: '35px'}} />
+          <span>Shipment Tracker</span>
+        </div>
+        <button className="hamburger-btn" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+          {mobileMenuOpen ? '✕' : '☰'}
+        </button>
+      </div>
+
       {/* Sidebar */}
-      <div className="sidebar">
+      <div className={`sidebar ${mobileMenuOpen ? 'open' : ''}`}>
         <div className="sidebar-logo">
-          <span>🛡️</span> CustomsTracker
+          <img src={logoUrl} alt="Logo" />
+          <span>Shipment Tracker</span>
         </div>
         <div className="nav-links">
           <div className={`nav-item ${currentTab === 'analytics' ? 'active' : ''}`} onClick={() => setCurrentTab('analytics')}>
@@ -131,8 +146,10 @@ export default function FounderDashboard({ user, profile, handleLogout }) {
           <div className={`nav-item ${currentTab === 'staff' ? 'active' : ''}`} onClick={() => setCurrentTab('staff')}>
             👥 Staff Management
           </div>
-          <div className="nav-item" style={{ marginTop: 'auto' }} onClick={handleLogout}>
-            🚪 Logout
+          <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+            <div className="nav-item" onClick={handleLogout}>
+              🚪 Logout
+            </div>
           </div>
         </div>
       </div>
@@ -168,7 +185,7 @@ export default function FounderDashboard({ user, profile, handleLogout }) {
             
             {/* Metric Tiles */}
             <div className="metrics-grid">
-              <div className="metric-tile">
+              <div className="metric-tile" onClick={() => { setReportStatusFilter(''); setCurrentTab('reports'); }} style={{ cursor: 'pointer' }}>
                 <span className="metric-title">Total Shipments</span>
                 <span className="metric-value">{loadingStats ? '…' : stats.shipments}</span>
               </div>
@@ -176,11 +193,11 @@ export default function FounderDashboard({ user, profile, handleLogout }) {
                 <span className="metric-title">Active Customers</span>
                 <span className="metric-value">{loadingStats ? '…' : stats.customers}</span>
               </div>
-              <div className="metric-tile red">
+              <div className="metric-tile red" onClick={() => { setReportStatusFilter('Pending'); setCurrentTab('reports'); }} style={{ cursor: 'pointer', outline: 'none' }}>
                 <span className="metric-title">DO Pending</span>
                 <span className="metric-value">{loadingStats ? '…' : stats.pending}</span>
               </div>
-              <div className="metric-tile amber">
+              <div className="metric-tile amber" onClick={() => { setReportStatusFilter('Completed'); setCurrentTab('reports'); }} style={{ cursor: 'pointer' }}>
                 <span className="metric-title">DO Completed</span>
                 <span className="metric-value">{loadingStats ? '…' : stats.completed}</span>
               </div>
@@ -357,7 +374,7 @@ export default function FounderDashboard({ user, profile, handleLogout }) {
 
         {/* ── REPORTS TAB ── */}
         {currentTab === 'reports' && (
-          <Reports />
+          <Reports initialStatusFilter={reportStatusFilter} />
         )}
 
         {/* ── TRACKER TAB ── */}
@@ -390,7 +407,8 @@ export default function FounderDashboard({ user, profile, handleLogout }) {
                     <th colSpan="7" style={{ background: '#99f6e4', color: '#0f766e', textAlign: 'center', borderRight: '2px solid #d1d5db' }}>CUSTOMS CLEARANCE</th>
                     <th colSpan="2" style={{ background: '#5eead4', color: '#0f766e', textAlign: 'center', borderRight: '2px solid #d1d5db' }}>DELIVERY ORDER</th>
                     <th colSpan="3" style={{ background: '#2dd4bf', color: 'white', textAlign: 'center', borderRight: '2px solid #d1d5db' }}>TRANSPORT</th>
-                    <th colSpan="6" style={{ background: '#14b8a6', color: 'white', textAlign: 'center' }}>COMPLETION & TRACKING</th>
+                    <th colSpan="2" style={{ background: '#14b8a6', color: 'white', textAlign: 'center', borderRight: '2px solid #d1d5db' }}>BILLING</th>
+                    <th colSpan="5" style={{ background: '#0d9488', color: 'white', textAlign: 'center' }}>COMPLETION & TRACKING</th>
                   </tr>
                   <tr>
                     <th>FILE NO</th><th>CUSTOMER</th><th>ETA</th><th>CONTAINERS</th><th>CONTAINER TYPE</th><th>QTY</th>
@@ -399,7 +417,8 @@ export default function FounderDashboard({ user, profile, handleLogout }) {
                     <th>CLEAR MODE</th><th>BE NO</th><th>BE DATE</th><th>BE FILED</th><th>CLEAR STATUS</th><th>STATUS DATE</th><th style={{ borderRight: '2px solid #d1d5db' }}>HANDLED BY</th>
                     <th>DO STATUS</th><th style={{ borderRight: '2px solid #d1d5db' }}>DO DATE</th>
                     <th>DELIVERY TYPE</th><th>TRANSPORT</th><th style={{ borderRight: '2px solid #d1d5db' }}>VEHICLE NO</th>
-                    <th>FACTORY DEL.</th><th>EMPTY RET.</th><th>BILLED DATE</th><th>PROGRESS</th><th>REMARKS</th><th>ENTERED BY</th>
+                    <th>MOVED TO DATE</th><th style={{ borderRight: '2px solid #d1d5db' }}>BILLED DATE</th>
+                    <th>FACTORY DEL.</th><th>EMPTY RET.</th><th>PROGRESS</th><th>REMARKS</th><th>ENTERED BY</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -433,9 +452,10 @@ export default function FounderDashboard({ user, profile, handleLogout }) {
                       <td>{s.delivery_type}</td>
                       <td>{s.transport_name}</td>
                       <td style={{ borderRight: '2px solid #d1d5db' }}>{s.vehicle_no}</td>
+                      <td>{s.moved_to_date}</td>
+                      <td style={{ borderRight: '2px solid #d1d5db' }}>{s.billed_date}</td>
                       <td>{s.factory_delivered}</td>
                       <td>{s.empty_returned}</td>
-                      <td>{s.billed_date}</td>
                       <td>{s.progress}</td>
                       <td>{s.remarks}</td>
                       <td style={{ color: 'var(--purple-600)', fontWeight: 600 }}>{s.entered_by_profile?.full_name || 'Founder'}</td>

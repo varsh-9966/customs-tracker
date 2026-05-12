@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { api } from '../../../services/api'
 import Reports from '../../Shared/Reports'
+import logoUrl from '../../../assets/logo.png'
 
 // Auto-calculate progress from filled fields
 function calcProgress(s) {
@@ -11,7 +12,7 @@ function calcProgress(s) {
     s.clear_status, s.handled_by,
     s.do_status, s.do_date,
     s.delivery_type, s.transport_name,
-    s.factory_delivered, s.empty_returned, s.billed_date
+    s.factory_delivered, s.empty_returned, s.billed_date, s.moved_to_date
   ];
   const filled = fields.filter(Boolean).length;
   const total = fields.length;
@@ -23,7 +24,7 @@ function calcProgress(s) {
   return '100%';
 }
 
-export default function StaffDashboard({ user, profile, handleLogout }) {
+export default function StaffDashboard({ user, profile, handleLogout, installApp }) {
   const [currentTab, setCurrentTab] = useState('dashboard')
   const [shipments, setShipments] = useState([])
   const [loading, setLoading] = useState(true)
@@ -34,6 +35,8 @@ export default function StaffDashboard({ user, profile, handleLogout }) {
   const [recentShipments, setRecentShipments] = useState([])
   const [historyFilter, setHistoryFilter] = useState('')
   const [dashboardFilter, setDashboardFilter] = useState('all')
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [reportStatusFilter, setReportStatusFilter] = useState('')
 
   // New row state
   const [isAdding, setIsAdding] = useState(false)
@@ -45,7 +48,7 @@ export default function StaffDashboard({ user, profile, handleLogout }) {
     docs_received: '', docs_date: '', clear_mode: '', be_no: '', be_date: '', be_filed_date: '',
     clear_status: '', clear_status_date: '', handled_by: '', do_status: '', do_date: '',
     delivery_type: '', transport_name: '', vehicle_no: '',
-    factory_delivered: '', empty_returned: '', billed_date: '',
+    factory_delivered: '', empty_returned: '', billed_date: '', moved_to_date: '',
     remarks: ''
   })
 
@@ -149,6 +152,7 @@ export default function StaffDashboard({ user, profile, handleLogout }) {
         factory_delivered: newRow.factory_delivered || null,
         empty_returned: newRow.empty_returned || null,
         billed_date: newRow.billed_date || null,
+        moved_to_date: newRow.moved_to_date || null,
         progress: calcProgress(newRow),
         remarks: newRow.remarks || null,
         transport_name: newRow.transport_name || null,
@@ -157,7 +161,7 @@ export default function StaffDashboard({ user, profile, handleLogout }) {
       await api.createShipment(body)
       setMessage('Shipment added successfully!')
       setIsAdding(false)
-      setNewRow({ file_no: '', customerName: '', eta: '', containers: '', container_type: '', qty: '', bl_no: '', docs_received: '', docs_date: '', clear_mode: '', be_no: '', be_date: '', be_filed_date: '', clear_status: '', clear_status_date: '', handled_by: '', do_status: '', do_date: '', delivery_type: '', transport_name: '', vehicle_no: '', factory_delivered: '', empty_returned: '', billed_date: '', remarks: '' })
+      setNewRow({ file_no: '', customerName: '', eta: '', containers: '', container_type: '', qty: '', bl_no: '', docs_received: '', docs_date: '', clear_mode: '', be_no: '', be_date: '', be_filed_date: '', clear_status: '', clear_status_date: '', handled_by: '', do_status: '', do_date: '', delivery_type: '', transport_name: '', vehicle_no: '', factory_delivered: '', empty_returned: '', billed_date: '', moved_to_date: '', remarks: '' })
       fetchShipments(); fetchStats()
     } catch (err) { console.error(err); setMessage(err.message) }
     finally { setSaving(false) }
@@ -174,7 +178,7 @@ export default function StaffDashboard({ user, profile, handleLogout }) {
       handled_by: s.handled_by || '', do_status: s.do_status || '', do_date: s.do_date || '',
       delivery_type: s.delivery_type || '', transport_name: s.transport_name || '',
       vehicle_no: s.vehicle_no || '', factory_delivered: s.factory_delivered || '',
-      empty_returned: s.empty_returned || '', billed_date: s.billed_date || '',
+      empty_returned: s.empty_returned || '', billed_date: s.billed_date || '', moved_to_date: s.moved_to_date || '',
       remarks: s.remarks || ''
     })
   }
@@ -222,10 +226,22 @@ export default function StaffDashboard({ user, profile, handleLogout }) {
 
   return (
     <div className="dashboard-layout">
+      {/* Mobile Header */}
+      <div className="mobile-header">
+        <div className="mobile-logo">
+          <img src={logoUrl} alt="Logo" style={{height: '35px'}} />
+          <span>Shipment Tracker</span>
+        </div>
+        <button className="hamburger-btn" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+          {mobileMenuOpen ? '✕' : '☰'}
+        </button>
+      </div>
+
       {/* Sidebar */}
-      <div className="sidebar">
+      <div className={`sidebar ${mobileMenuOpen ? 'open' : ''}`}>
         <div className="sidebar-logo">
-          <span>🌍</span> CustomsTracker
+          <img src={logoUrl} alt="Logo" />
+          <span>Shipment Tracker</span>
         </div>
         <div className="nav-links">
           <div className={`nav-item ${currentTab === 'dashboard' ? 'active' : ''}`} onClick={() => setCurrentTab('dashboard')}>
@@ -237,8 +253,10 @@ export default function StaffDashboard({ user, profile, handleLogout }) {
           <div className={`nav-item ${currentTab === 'reports' ? 'active' : ''}`} onClick={() => setCurrentTab('reports')}>
             📄 Reports
           </div>
-          <div className="nav-item" style={{ marginTop: 'auto' }} onClick={handleLogout}>
-            🚪 Logout
+          <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+            <div className="nav-item" onClick={handleLogout}>
+              🚪 Logout
+            </div>
           </div>
         </div>
       </div>
@@ -297,17 +315,17 @@ export default function StaffDashboard({ user, profile, handleLogout }) {
 
             {/* Stat Tiles */}
             <div className="staff-metrics-grid">
-              <div className="staff-metric-tile">
+              <div className="staff-metric-tile" onClick={() => { setReportStatusFilter(''); setCurrentTab('reports'); }} style={{ cursor: 'pointer' }}>
                 <div className="tile-icon">🚢</div>
                 <div className="tile-label">Total Shipments</div>
                 <div className="tile-value">{loadingStats ? '…' : stats.total}</div>
               </div>
-              <div className="staff-metric-tile teal">
+              <div className="staff-metric-tile teal" onClick={() => { setReportStatusFilter('Completed'); setCurrentTab('reports'); }} style={{ cursor: 'pointer' }}>
                 <div className="tile-icon">✅</div>
                 <div className="tile-label">DO Completed</div>
                 <div className="tile-value">{loadingStats ? '…' : stats.completed}</div>
               </div>
-              <div className="staff-metric-tile amber">
+              <div className="staff-metric-tile amber" onClick={() => { setReportStatusFilter('Pending'); setCurrentTab('reports'); }} style={{ cursor: 'pointer' }}>
                 <div className="tile-icon">⏳</div>
                 <div className="tile-label">DO Pending</div>
                 <div className="tile-value">{loadingStats ? '…' : stats.pending}</div>
@@ -403,7 +421,8 @@ export default function StaffDashboard({ user, profile, handleLogout }) {
                     <th colSpan="7" style={{ background: '#99f6e4', color: '#0f766e', textAlign: 'center', borderRight: '2px solid #d1d5db' }}>CUSTOMS CLEARANCE</th>
                     <th colSpan="2" style={{ background: '#5eead4', color: '#0f766e', textAlign: 'center', borderRight: '2px solid #d1d5db' }}>DELIVERY ORDER</th>
                     <th colSpan="3" style={{ background: '#2dd4bf', color: 'white', textAlign: 'center', borderRight: '2px solid #d1d5db' }}>TRANSPORT</th>
-                    <th colSpan="6" style={{ background: '#14b8a6', color: 'white', textAlign: 'center' }}>COMPLETION & TRACKING</th>
+                    <th colSpan="2" style={{ background: '#14b8a6', color: 'white', textAlign: 'center', borderRight: '2px solid #d1d5db' }}>BILLING</th>
+                    <th colSpan="6" style={{ background: '#0d9488', color: 'white', textAlign: 'center' }}>COMPLETION & TRACKING</th>
                   </tr>
                   <tr>
                     <th>FILE NO *</th><th>CUSTOMER *</th><th>ETA</th><th>CONTAINERS</th><th>CONTAINER TYPE</th><th>QTY</th>
@@ -412,7 +431,8 @@ export default function StaffDashboard({ user, profile, handleLogout }) {
                     <th>CLEAR MODE</th><th>BE NO</th><th>BE DATE</th><th>BE FILED</th><th>CLEAR STATUS</th><th>STATUS DATE</th><th style={{ borderRight: '2px solid #d1d5db' }}>HANDLED BY</th>
                     <th>DO STATUS</th><th style={{ borderRight: '2px solid #d1d5db' }}>DO DATE</th>
                     <th>DELIVERY TYPE</th><th>TRANSPORT</th><th style={{ borderRight: '2px solid #d1d5db' }}>VEHICLE NO</th>
-                    <th>FACTORY DEL.</th><th>EMPTY RET.</th><th>BILLED DATE</th><th>PROGRESS</th><th>REMARKS</th><th>ENTERED BY</th><th>ACTIONS</th>
+                    <th>MOVED TO DATE</th><th style={{ borderRight: '2px solid #d1d5db' }}>BILLED DATE</th>
+                    <th>FACTORY DEL.</th><th>EMPTY RET.</th><th>PROGRESS</th><th>REMARKS</th><th>ENTERED BY</th><th>ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -447,9 +467,10 @@ export default function StaffDashboard({ user, profile, handleLogout }) {
                         <td><select className="table-select" value={editRow.delivery_type} onChange={e => setEditRow({...editRow, delivery_type: e.target.value})}><option value=""></option><option>Direct Out</option><option>Unloading</option><option>Bonding</option></select></td>
                         <td><input className="table-input" value={editRow.transport_name} onChange={e => setEditRow({...editRow, transport_name: e.target.value})} /></td>
                         <td style={{ borderRight: '2px solid #d1d5db' }}><input className="table-input" value={editRow.vehicle_no} onChange={e => setEditRow({...editRow, vehicle_no: e.target.value})} /></td>
+                        <td><input className="table-input" type="date" value={editRow.moved_to_date} onChange={e => setEditRow({...editRow, moved_to_date: e.target.value})} /></td>
+                        <td style={{ borderRight: '2px solid #d1d5db' }}><input className="table-input" type="date" value={editRow.billed_date} onChange={e => setEditRow({...editRow, billed_date: e.target.value})} /></td>
                         <td><input className="table-input" type="date" value={editRow.factory_delivered} onChange={e => setEditRow({...editRow, factory_delivered: e.target.value})} /></td>
                         <td><input className="table-input" type="date" value={editRow.empty_returned} onChange={e => setEditRow({...editRow, empty_returned: e.target.value})} /></td>
-                        <td><input className="table-input" type="date" value={editRow.billed_date} onChange={e => setEditRow({...editRow, billed_date: e.target.value})} /></td>
                         <td style={{ color: 'var(--purple-600)', fontWeight: 600, fontSize: '0.8rem' }}>{calcProgress(editRow)} (auto)</td>
                         <td><input className="table-input" value={editRow.remarks} onChange={e => setEditRow({...editRow, remarks: e.target.value})} /></td>
                         <td style={{ color: 'var(--text-light)', fontSize: '0.8rem' }}>{s.entered_by_profile?.full_name}</td>
@@ -481,9 +502,10 @@ export default function StaffDashboard({ user, profile, handleLogout }) {
                         <td>{s.delivery_type}</td>
                         <td>{s.transport_name}</td>
                         <td style={{ borderRight: '2px solid #d1d5db' }}>{s.vehicle_no}</td>
+                        <td>{s.moved_to_date}</td>
+                        <td style={{ borderRight: '2px solid #d1d5db' }}>{s.billed_date}</td>
                         <td>{s.factory_delivered}</td>
                         <td>{s.empty_returned}</td>
-                        <td>{s.billed_date}</td>
                         <td>
                           {s.progress ? (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -575,9 +597,10 @@ export default function StaffDashboard({ user, profile, handleLogout }) {
                       </td>
                       <td><input className="table-input" value={newRow.transport_name} onChange={e => setNewRow({...newRow, transport_name: e.target.value})} placeholder="Transport" /></td>
                       <td style={{ borderRight: '2px solid #d1d5db' }}><input className="table-input" value={newRow.vehicle_no} onChange={e => setNewRow({...newRow, vehicle_no: e.target.value})} placeholder="Vehicle No" /></td>
+                      <td><input type="date" className="table-input" value={newRow.moved_to_date} onChange={e => setNewRow({...newRow, moved_to_date: e.target.value})} /></td>
+                      <td style={{ borderRight: '2px solid #d1d5db' }}><input type="date" className="table-input" value={newRow.billed_date} onChange={e => setNewRow({...newRow, billed_date: e.target.value})} /></td>
                       <td><input type="date" className="table-input" value={newRow.factory_delivered} onChange={e => setNewRow({...newRow, factory_delivered: e.target.value})} /></td>
                       <td><input type="date" className="table-input" value={newRow.empty_returned} onChange={e => setNewRow({...newRow, empty_returned: e.target.value})} /></td>
-                      <td><input type="date" className="table-input" value={newRow.billed_date} onChange={e => setNewRow({...newRow, billed_date: e.target.value})} /></td>
                       <td style={{ color: '#0d9488', fontWeight: 600, fontSize: '0.8rem' }}>{calcProgress(newRow)} (auto)</td>
                       <td><input className="table-input" value={newRow.remarks} onChange={e => setNewRow({...newRow, remarks: e.target.value})} /></td>
                       <td>
@@ -600,7 +623,7 @@ export default function StaffDashboard({ user, profile, handleLogout }) {
 
         {/* ── REPORTS TAB ── */}
         {currentTab === 'reports' && (
-          <Reports />
+          <Reports initialStatusFilter={reportStatusFilter} />
         )}
       </div>
     </div>

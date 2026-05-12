@@ -8,6 +8,17 @@ from config import SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 
 router = APIRouter(prefix="/api/staff", tags=["Staff"])
 
+@router.get("/founder-count")
+def get_founder_count():
+    """Return the exact count of founder accounts. Publicly accessible for login page."""
+    try:
+        result = supabase.table("profiles").select("id", count="exact").eq("role", "founder").execute()
+        return {"count": result.count or 0}
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 
 @router.get("")
 def list_staff(user: dict = Depends(require_founder)):

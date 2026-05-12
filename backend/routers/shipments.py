@@ -91,6 +91,17 @@ def list_shipments(status: Optional[str] = None, user: dict = Depends(get_curren
             p_resp = supabase.table("profiles").select("id, full_name").in_("id", list(all_ids)).execute()
             profile_map = {p["id"]: p["full_name"] for p in (p_resp.data or [])}
 
+        # Batch resolve transport logs
+        shipment_ids = [s["id"] for s in raw_data]
+        transport_map = {}
+        if shipment_ids:
+            try:
+                t_resp = supabase.table("transport_logs").select("shipment_id, transport_name, vehicle_no").in_("shipment_id", shipment_ids).execute()
+                for t in (t_resp.data or []):
+                    transport_map[t["shipment_id"]] = {"name": t.get("transport_name") or "", "vehicle": t.get("vehicle_no") or ""}
+            except Exception as e:
+                pass
+
         data = []
         for s in raw_data:
             # Resolve Handled By
@@ -110,10 +121,10 @@ def list_shipments(status: Optional[str] = None, user: dict = Depends(get_curren
             else:
                 s["entered_by_profile"] = {"full_name": "Founder"}
 
-            # Transport logs (minimal separate query for now to be safe, or just skip if not needed)
-            # For now, let's just make sure it doesn't crash.
-            s["transport_name"] = ""
-            s["vehicle_no"] = ""
+            # Map transport logs
+            t_log = transport_map.get(s["id"], {})
+            s["transport_name"] = t_log.get("name", "")
+            s["vehicle_no"] = t_log.get("vehicle", "")
             
             data.append(s)
         return data

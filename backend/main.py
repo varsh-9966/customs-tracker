@@ -3,6 +3,28 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from routers import shipments, customers, staff, stats
 
+import shutil
+import os
+import base64
+try:
+    if not os.path.exists("../customs-tracker/public"):
+        os.makedirs("../customs-tracker/public", exist_ok=True)
+    shutil.copy("../customs-tracker/src/assets/logo.png", "../customs-tracker/public/logo.png")
+    
+    with open("../customs-tracker/public/logo.png", "rb") as img_file:
+        b64_string = base64.b64encode(img_file.read()).decode('utf-8')
+        
+    svg_content = f"""<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#ffffff" />
+  <image href="data:image/png;base64,{b64_string}" x="56" y="56" width="400" height="400" preserveAspectRatio="xMidYMid meet" />
+</svg>"""
+
+    with open("../customs-tracker/public/pwa-icon.svg", "w") as f:
+        f.write(svg_content)
+        
+except Exception as e:
+    print("Logo copy/SVG failed:", e)
+
 app = FastAPI(
     title="CustomsTracker API",
     description="Backend for the CustomsTracker shipment management system.",

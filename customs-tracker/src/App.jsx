@@ -3,6 +3,7 @@ import { supabase } from './services/supabaseClient'
 import StaffDashboard from './modules/Staff/pages/StaffDashboard'
 import FounderDashboard from './modules/Founder/pages/FounderDashboard'
 import './App.css'
+import logoUrl from './assets/logo.png'
 
 export default function App() {
   const [user, setUser] = useState(null)
@@ -13,6 +14,41 @@ export default function App() {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [isLogin, setIsLogin] = useState(true)
+  const [installPrompt, setInstallPrompt] = useState(null)
+  const [founderCount, setFounderCount] = useState(0)
+
+  useEffect(() => {
+    fetchFounderCount()
+  }, [])
+
+  const fetchFounderCount = async () => {
+    try {
+      const res = await fetch('/api/staff/founder-count')
+      if (res.ok) {
+        const data = await res.json()
+        setFounderCount(data.count)
+      }
+    } catch (e) {
+      console.error('Failed to fetch founder count:', e)
+    }
+  }
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+  }, []);
+
+  const handleInstallClick = () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    installPrompt.userChoice.then(() => {
+      setInstallPrompt(null);
+    });
+  };
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -61,6 +97,10 @@ export default function App() {
   }
 
   const handleFounderSignup = async () => {
+    if (founderCount >= 2) {
+      setMessage('Maximum limit of 2 founders reached. Cannot create more accounts.')
+      return
+    }
     setLoading(true)
     setMessage('')
     const { error } = await supabase.auth.signUp({
@@ -74,11 +114,11 @@ export default function App() {
   }
 
   if (user && profile?.role === 'founder') {
-    return <FounderDashboard user={user} profile={profile} handleLogout={handleLogout} />
+    return <FounderDashboard user={user} profile={profile} handleLogout={handleLogout} installApp={installPrompt ? handleInstallClick : null} />
   }
 
   if (user && profile?.role === 'staff') {
-    return <StaffDashboard user={user} profile={profile} handleLogout={handleLogout} />
+    return <StaffDashboard user={user} profile={profile} handleLogout={handleLogout} installApp={installPrompt ? handleInstallClick : null} />
   }
 
   if (user) {
@@ -107,8 +147,8 @@ export default function App() {
     <div className="container">
       <div className="login-card">
         <div className="login-header">
-          <div className="logo">🌍</div>
-          <h2>CustomsTracker</h2>
+          <div className="logo"><img src={logoUrl} alt="Logo" style={{height: '60px'}} /></div>
+          <h2>Shipment Tracker</h2>
           <p>{isLogin ? 'Sign in to access your portal' : 'Register your founder account'}</p>
         </div>
 
@@ -135,12 +175,23 @@ export default function App() {
           )}
           
           <div className="toggle-wrapper">
-            <p className="toggle">
-              {isLogin ? 'Need an admin account?' : 'Already have access?'}
-              <button className="link-btn" onClick={() => { setIsLogin(!isLogin); setMessage('') }}>
-                {isLogin ? ' Register as Founder' : ' Sign In here'}
-              </button>
-            </p>
+            {founderCount < 2 ? (
+              <p className="toggle">
+                {isLogin ? 'Need an admin account?' : 'Already have access?'}
+                <button className="link-btn" onClick={() => { setIsLogin(!isLogin); setMessage('') }}>
+                  {isLogin ? ' Register as Founder' : ' Sign In here'}
+                </button>
+              </p>
+            ) : (
+              !isLogin && (
+                <p className="toggle">
+                  Maximum founder limit reached.
+                  <button className="link-btn" onClick={() => { setIsLogin(true); setMessage('') }}>
+                    {' Back to Login'}
+                  </button>
+                </p>
+              )
+            )}
           </div>
           
           {message && <div className="error-badge">{message}</div>}

@@ -1,0 +1,17 @@
+{
+  "name": "Vijay Shipping Tracker",
+  "short_name": "Shipments",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fdf2f8",
+  "theme_color": "#db2777",
+  "description": "Logistics and shipment tracking application.",
+  "icons": [
+    {
+      "src": "/pwa-icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
